@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI('AIzaSyDRkpo9omKngxr-4dpMNjvO6HfQYivA8XM');
 
 interface AnalysisResult {
   differences: Array<{
@@ -19,30 +19,39 @@ export async function analyzeImageDifferences(
 
     const prompt = `Analyze these two UI design images and identify the visual differences between them. 
     Focus on:
-    1. Spacing inconsistencies
-    2. Color differences
-    3. Font variations
-    4. Margin/padding issues
+    1. Spacing inconsistencies (padding, margins, gaps)
+    2. Color differences (backgrounds, text, borders)
+    3. Font variations (size, family, weight)
+    4. Layout issues (alignment, positioning)
 
     For each difference, specify:
     - The type (spacing, margin, color, or font)
-    - A clear description of what needs to be fixed
+    - A clear description in Spanish of what needs to be fixed
     - Priority level (high, medium, low) based on visual impact
 
-    Format your response as a structured JSON array of differences.`;
+    Respond in this exact JSON format:
+    {
+      "differences": [
+        {
+          "type": "spacing|margin|color|font",
+          "description": "descripción en español",
+          "priority": "high|medium|low"
+        }
+      ]
+    }`;
 
     const result = await model.generateContent([
       prompt,
       {
         inlineData: {
           mimeType: 'image/png',
-          data: originalImageBase64.split(',')[1]
+          data: originalImageBase64.replace(/^data:image\/\w+;base64,/, '')
         }
       },
       {
         inlineData: {
           mimeType: 'image/png',
-          data: implementationImageBase64.split(',')[1]
+          data: implementationImageBase64.replace(/^data:image\/\w+;base64,/, '')
         }
       }
     ]);
@@ -50,18 +59,40 @@ export async function analyzeImageDifferences(
     const response = await result.response;
     const text = response.text();
 
-    // Parse the JSON response from Gemini
-    const differences = JSON.parse(text);
+    try {
+      // Parse the JSON response from Gemini
+      const parsedResponse = JSON.parse(text);
 
-    return {
-      differences: differences.map((diff: any) => ({
-        type: diff.type,
-        description: diff.description,
-        priority: diff.priority,
-      }))
-    };
+      // Validate the response structure
+      if (!parsedResponse.differences || !Array.isArray(parsedResponse.differences)) {
+        throw new Error('Invalid response format from Gemini API');
+      }
+
+      return {
+        differences: parsedResponse.differences.map((diff: any) => ({
+          type: diff.type || 'spacing',
+          description: diff.description || 'Diferencia detectada',
+          priority: diff.priority || 'medium',
+        }))
+      };
+    } catch (parseError) {
+      console.error('Error parsing Gemini response:', parseError);
+      return {
+        differences: [{
+          type: 'spacing',
+          description: 'Error al analizar las diferencias. Por favor, intenta de nuevo.',
+          priority: 'high'
+        }]
+      };
+    }
   } catch (error) {
     console.error('Error analyzing images with Gemini:', error);
-    throw error;
+    return {
+      differences: [{
+        type: 'spacing',
+        description: 'Error al conectar con el servicio de análisis. Por favor, verifica tu conexión e intenta de nuevo.',
+        priority: 'high'
+      }]
+    };
   }
 }
