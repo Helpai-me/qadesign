@@ -6,9 +6,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquarePlus, MessageSquare } from 'lucide-react';
+import { MessageSquarePlus, MessageSquare, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import * as React from 'react';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { DifferenceReport } from './DifferenceReport';
 
 interface DifferenceDetectorProps {
   originalImage: string;
@@ -21,7 +23,7 @@ interface Comment {
   timestamp: string;
 }
 
-interface DesignDifference {
+export interface DesignDifference {
   type: 'spacing' | 'margin' | 'color' | 'font';
   description: string;
   location: {
@@ -404,7 +406,25 @@ export default function DifferenceDetector({ originalImage, implementationImage 
         </div>
 
         <Card className="p-4">
-          <h3 className="font-semibold mb-2">Diferencias Detectadas</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold">Diferencias Detectadas</h3>
+            <PDFDownloadLink
+              document={<DifferenceReport differences={differences} />}
+              fileName="reporte-diferencias.pdf"
+              className="ml-auto"
+            >
+              {({ loading }) => (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || differences.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar PDF
+                </Button>
+              )}
+            </PDFDownloadLink>
+          </div>
           <ScrollArea className="h-[400px] pr-4">
             {differences.map((diff, index) => (
               <motion.div
