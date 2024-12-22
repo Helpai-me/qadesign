@@ -120,25 +120,25 @@ export default function MeasurementTools({ image }: MeasurementToolsProps) {
                 <Line
                   points={measurement.points}
                   stroke="#2563eb"
-                  strokeWidth={2}
-                  dash={[5, 5]}
+                  strokeWidth={1}
+                  dash={[4, 4]}
                 />
                 {/* Puntos de inicio y fin */}
                 <Circle
                   x={measurement.points[0]}
                   y={measurement.points[1]}
-                  radius={4}
+                  radius={3}
                   fill="#2563eb"
                   stroke="#ffffff"
-                  strokeWidth={2}
+                  strokeWidth={1}
                 />
                 <Circle
                   x={measurement.points[2]}
                   y={measurement.points[3]}
-                  radius={4}
+                  radius={3}
                   fill="#2563eb"
                   stroke="#ffffff"
-                  strokeWidth={2}
+                  strokeWidth={1}
                 />
                 {/* Texto de la medida */}
                 <Text
@@ -146,8 +146,9 @@ export default function MeasurementTools({ image }: MeasurementToolsProps) {
                   y={(measurement.points[1] + measurement.points[3]) / 2 - 7}
                   text={`${Math.round(measurement.distance)}px`}
                   fill="#2563eb"
-                  fontSize={12}
+                  fontSize={11}
                   fontFamily="system-ui"
+                  fontStyle="500"
                 />
               </React.Fragment>
             ))}
