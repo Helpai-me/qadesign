@@ -14,8 +14,17 @@ export async function analyzeImageDifferences(
   originalImageBase64: string,
   implementationImageBase64: string
 ): Promise<AnalysisResult> {
+  console.log('Starting image analysis with Gemini...');
+
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
+
+    // Clean base64 strings
+    const cleanBase64 = (base64: string) => base64.replace(/^data:image\/\w+;base64,/, '');
+    const originalClean = cleanBase64(originalImageBase64);
+    const implementationClean = cleanBase64(implementationImageBase64);
+
+    console.log('Prepared images for analysis');
 
     const prompt = `Analyze these two UI design images and identify the visual differences between them. 
     Focus on:
@@ -40,31 +49,36 @@ export async function analyzeImageDifferences(
       ]
     }`;
 
+    console.log('Sending request to Gemini API...');
+
     const result = await model.generateContent([
       prompt,
       {
         inlineData: {
           mimeType: 'image/png',
-          data: originalImageBase64.replace(/^data:image\/\w+;base64,/, '')
+          data: originalClean
         }
       },
       {
         inlineData: {
           mimeType: 'image/png',
-          data: implementationImageBase64.replace(/^data:image\/\w+;base64,/, '')
+          data: implementationClean
         }
       }
     ]);
 
+    console.log('Received response from Gemini API');
+
     const response = await result.response;
     const text = response.text();
 
+    console.log('Processing Gemini response:', text);
+
     try {
-      // Parse the JSON response from Gemini
       const parsedResponse = JSON.parse(text);
 
-      // Validate the response structure
       if (!parsedResponse.differences || !Array.isArray(parsedResponse.differences)) {
+        console.error('Invalid response format:', parsedResponse);
         throw new Error('Invalid response format from Gemini API');
       }
 

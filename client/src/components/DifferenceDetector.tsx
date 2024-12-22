@@ -72,7 +72,6 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             height: originalImg.height * scale,
           });
 
-          // Convert images to base64 for Gemini API
           const canvas = document.createElement('canvas');
           canvas.width = originalImg.width;
           canvas.height = originalImg.height;
@@ -80,28 +79,24 @@ export default function DifferenceDetector({ originalImage, implementationImage 
           const ctx = canvas.getContext('2d');
           if (!ctx) return;
 
-          // Get base64 for original image
           ctx.drawImage(originalImg, 0, 0);
           const originalBase64 = canvas.toDataURL('image/png');
 
-          // Get base64 for implementation image
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(implementationImg, 0, 0);
           const implementationBase64 = canvas.toDataURL('image/png');
 
-          // Analyze differences using Gemini
           const analysis = await analyzeImageDifferences(
             originalBase64,
             implementationBase64
           );
 
-          // Convert Gemini analysis to our difference format
           const aiDifferences = analysis.differences.map((diff, index) => ({
             type: diff.type,
             description: diff.description,
             location: {
               x: 0,
-              y: index * 50, // Stack differences vertically
+              y: index * 50,
               width: containerWidth,
               height: 40,
             },
@@ -176,8 +171,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
   const detectColorDifferences = (imageData1: ImageData, imageData2: ImageData, width: number, height: number) => {
     const differences = [];
-    const sampleSize = 10; // Muestrear cada 10 píxeles para rendimiento
-    const colorThreshold = 30; // Umbral para diferencias de color significativas
+    const sampleSize = 10;
+    const colorThreshold = 30;
 
     for (let y = 0; y < height; y += sampleSize) {
       for (let x = 0; x < width; x += sampleSize) {
@@ -195,7 +190,6 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       }
     }
 
-    // Agrupar diferencias de color cercanas
     return differences.reduce((acc, curr) => {
       const similar = acc.find(d =>
         Math.abs(d.x - curr.x) < 50 &&
@@ -308,14 +302,17 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               fileName="reporte-diferencias.pdf"
               className="ml-auto"
             >
-              {({ loading }: { loading: boolean }) => (
+              {({ loading, url }) => (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={loading || differences.length === 0}
+                  asChild={!!url}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar PDF
+                  <span className="flex items-center">
+                    <Download className="h-4 w-4 mr-2" />
+                    {loading ? 'Generando...' : 'Exportar PDF'}
+                  </span>
                 </Button>
               )}
             </PDFDownloadLink>
