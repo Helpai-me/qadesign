@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Image, Rect } from 'react-konva';
 import { loadImage } from '@/lib/imageProcessing';
-import { analyzeImageDifferences } from '@/lib/geminiService';
+import { analyzeImageDifferences } from '@/lib/openaiService';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -25,7 +25,7 @@ interface Comment {
 }
 
 export interface DesignDifference {
-  id: string; // Added unique ID
+  id: string; 
   type: 'spacing' | 'margin' | 'color' | 'font';
   description: string;
   location: {
@@ -41,7 +41,7 @@ export interface DesignDifference {
 export default function DifferenceDetector({ originalImage, implementationImage }: DifferenceDetectorProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [differences, setDifferences] = useState<DesignDifference[]>([]);
-  const [selectedDifference, setSelectedDifference] = useState<string | null>(null); // Changed to string
+  const [selectedDifference, setSelectedDifference] = useState<string | null>(null); 
   const [newComment, setNewComment] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<{
@@ -73,7 +73,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       console.log('Analysis completed:', analysis);
 
       const aiDifferences = analysis.differences.map((diff, index) => ({
-        id: `diff-${Date.now()}-${index}`, // Unique ID for each difference
+        id: `diff-${Date.now()}-${index}`, 
         type: diff.type,
         description: diff.description,
         location: {
@@ -249,7 +249,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     setDifferences(prev => {
       const updated = [...prev];
       const differenceIndex = updated.findIndex(diff => diff.id === differenceId);
-      if (differenceIndex === -1) return updated; // Handle case where difference is not found
+      if (differenceIndex === -1) return updated; 
 
       updated[differenceIndex].comments.push({
         id: Date.now().toString(),
@@ -308,7 +308,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               fileName="reporte-diferencias.pdf"
               className="ml-auto"
             >
-              {({ loading }) => (
+              {({ loading }: { loading: boolean }) => (
                 <Button
                   variant="outline"
                   size="sm"
