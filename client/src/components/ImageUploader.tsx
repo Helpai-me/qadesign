@@ -1,8 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Image as ImageIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,6 +37,34 @@ export default function ImageUploader({ onOriginalUpload, onImplementationUpload
     reader.readAsDataURL(file);
   }, [onOriginalUpload, onImplementationUpload, toast]);
 
+  const handlePaste = useCallback((e: ClipboardEvent, type: 'original' | 'implementation') => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          handleFileUpload([file], type);
+        }
+        break;
+      }
+    }
+  }, [handleFileUpload]);
+
+  useEffect(() => {
+    const originalHandler = (e: ClipboardEvent) => handlePaste(e, 'original');
+    const implementationHandler = (e: ClipboardEvent) => handlePaste(e, 'implementation');
+
+    document.addEventListener('paste', originalHandler);
+    document.addEventListener('paste', implementationHandler);
+
+    return () => {
+      document.removeEventListener('paste', originalHandler);
+      document.removeEventListener('paste', implementationHandler);
+    };
+  }, [handlePaste]);
+
   const originalDropzone = useDropzone({
     accept: { 'image/*': [] },
     onDrop: (files) => handleFileUpload(files, 'original')
@@ -48,11 +74,6 @@ export default function ImageUploader({ onOriginalUpload, onImplementationUpload
     accept: { 'image/*': [] },
     onDrop: (files) => handleFileUpload(files, 'implementation')
   });
-
-  const handleUrlUpload = (url: string, type: 'original' | 'implementation') => {
-    const handler = type === 'original' ? onOriginalUpload : onImplementationUpload;
-    handler(url);
-  };
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -65,15 +86,8 @@ export default function ImageUploader({ onOriginalUpload, onImplementationUpload
           <input {...originalDropzone.getInputProps()} />
           <Upload className="mx-auto h-8 w-8 mb-2 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            Drag & drop or click to upload the original design
+            Drag & drop, click to upload, or paste the original design
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            type="url"
-            placeholder="Or enter image URL"
-            onChange={(e) => handleUrlUpload(e.target.value, 'original')}
-          />
         </div>
       </div>
 
@@ -86,15 +100,8 @@ export default function ImageUploader({ onOriginalUpload, onImplementationUpload
           <input {...implementationDropzone.getInputProps()} />
           <ImageIcon className="mx-auto h-8 w-8 mb-2 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            Drag & drop or click to upload the implementation
+            Drag & drop, click to upload, or paste the implementation
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            type="url"
-            placeholder="Or enter image URL"
-            onChange={(e) => handleUrlUpload(e.target.value, 'implementation')}
-          />
         </div>
       </div>
     </div>
