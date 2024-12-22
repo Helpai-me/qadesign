@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Line, Text, Image } from 'react-konva';
+import { Stage, Layer, Line, Text, Image, Circle, Rect } from 'react-konva';
 import { Button } from '@/components/ui/button';
 import { Ruler, Move } from 'lucide-react';
 import { loadImage } from '@/lib/imageProcessing';
@@ -116,17 +116,48 @@ export default function MeasurementTools({ image }: MeasurementToolsProps) {
             )}
             {measurements.map((measurement, i) => (
               <React.Fragment key={i}>
+                {/* Línea de medición */}
                 <Line
                   points={measurement.points}
-                  stroke="#00ff00"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dash={[5, 5]}
+                />
+                {/* Puntos de inicio y fin */}
+                <Circle
+                  x={measurement.points[0]}
+                  y={measurement.points[1]}
+                  radius={4}
+                  fill="#2563eb"
+                  stroke="#ffffff"
                   strokeWidth={2}
                 />
+                <Circle
+                  x={measurement.points[2]}
+                  y={measurement.points[3]}
+                  radius={4}
+                  fill="#2563eb"
+                  stroke="#ffffff"
+                  strokeWidth={2}
+                />
+                {/* Fondo del texto */}
+                <Rect
+                  x={(measurement.points[0] + measurement.points[2]) / 2 - 30}
+                  y={(measurement.points[1] + measurement.points[3]) / 2 - 10}
+                  width={60}
+                  height={20}
+                  fill="rgba(37, 99, 235, 0.9)"
+                  cornerRadius={4}
+                />
+                {/* Texto de la medida */}
                 <Text
-                  x={(measurement.points[0] + measurement.points[2]) / 2}
-                  y={(measurement.points[1] + measurement.points[3]) / 2}
+                  x={(measurement.points[0] + measurement.points[2]) / 2 - 25}
+                  y={(measurement.points[1] + measurement.points[3]) / 2 - 7}
                   text={`${Math.round(measurement.distance)}px`}
-                  fill="#00ff00"
-                  fontSize={14}
+                  fill="#ffffff"
+                  fontSize={12}
+                  fontFamily="system-ui"
+                  padding={5}
                 />
               </React.Fragment>
             ))}
