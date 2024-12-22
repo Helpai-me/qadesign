@@ -23,6 +23,7 @@ interface DesignDifference {
 export default function DifferenceDetector({ originalImage, implementationImage }: DifferenceDetectorProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [differences, setDifferences] = useState<DesignDifference[]>([]);
+  const [selectedDifference, setSelectedDifference] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<{
     original: HTMLImageElement | null;
@@ -157,8 +158,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
-        const isWhite = imageData.data[i] > 240 && 
-                       imageData.data[i + 1] > 240 && 
+        const isWhite = imageData.data[i] > 240 &&
+                       imageData.data[i + 1] > 240 &&
                        imageData.data[i + 2] > 240;
 
         if (isWhite) {
@@ -190,8 +191,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     for (let y = 0; y < height; y += 2) { // Saltar píxeles para optimizar
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
-        const hasContent = imageData.data[i] < 240 || 
-                          imageData.data[i + 1] < 240 || 
+        const hasContent = imageData.data[i] < 240 ||
+                          imageData.data[i + 1] < 240 ||
                           imageData.data[i + 2] < 240;
 
         if (hasContent) {
@@ -203,6 +204,19 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     }
 
     return contentFound ? { left, right } : { left: 0, right: width };
+  };
+
+  const getColorForDifference = (type: 'spacing' | 'margin', isSelected: boolean) => {
+    if (type === 'spacing') {
+      return {
+        fill: isSelected ? "rgba(59, 130, 246, 0.3)" : "rgba(59, 130, 246, 0.1)",
+        stroke: isSelected ? "rgba(59, 130, 246, 0.8)" : "rgba(59, 130, 246, 0.3)"
+      };
+    }
+    return {
+      fill: isSelected ? "rgba(34, 197, 94, 0.3)" : "rgba(34, 197, 94, 0.1)",
+      stroke: isSelected ? "rgba(34, 197, 94, 0.8)" : "rgba(34, 197, 94, 0.3)"
+    };
   };
 
   return (
@@ -218,18 +232,22 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                   height={dimensions.height}
                 />
               )}
-              {differences.map((diff, i) => (
-                <Rect
-                  key={i}
-                  x={diff.location.x}
-                  y={diff.location.y}
-                  width={diff.location.width}
-                  height={diff.location.height}
-                  fill={diff.type === 'spacing' ? "rgba(59, 130, 246, 0.1)" : "rgba(34, 197, 94, 0.1)"}
-                  stroke={diff.type === 'spacing' ? "rgba(59, 130, 246, 0.3)" : "rgba(34, 197, 94, 0.3)"}
-                  strokeWidth={1}
-                />
-              ))}
+              {differences.map((diff, i) => {
+                const colors = getColorForDifference(diff.type, i === selectedDifference);
+                return (
+                  <Rect
+                    key={i}
+                    x={diff.location.x}
+                    y={diff.location.y}
+                    width={diff.location.width}
+                    height={diff.location.height}
+                    fill={colors.fill}
+                    stroke={colors.stroke}
+                    strokeWidth={1.5}
+                    onClick={() => setSelectedDifference(i)}
+                  />
+                );
+              })}
             </Layer>
           </Stage>
         </div>
@@ -240,7 +258,11 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             {differences.map((diff, index) => (
               <div
                 key={index}
-                className="mb-2 p-2 border rounded-lg hover:bg-accent transition-colors"
+                className={`mb-2 p-2 border rounded-lg transition-colors cursor-pointer
+                  ${index === selectedDifference 
+                    ? 'bg-accent border-primary' 
+                    : 'hover:bg-accent/50'}`}
+                onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
