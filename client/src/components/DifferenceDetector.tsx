@@ -72,35 +72,70 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
       const imageData1 = ctx1.getImageData(0, 0, canvas1.width, canvas1.height);
       const imageData2 = ctx2.getImageData(0, 0, canvas2.width, canvas2.height);
-      const diffAreas: Difference[] = [];
-      
-      // Simple pixel comparison
-      const threshold = 20; // Color difference threshold
-      let currentArea: Difference | null = null;
 
-      for (let y = 0; y < canvas1.height; y++) {
-        for (let x = 0; x < canvas1.width; x++) {
+      // Aumentamos el umbral y el tamaño mínimo de las diferencias
+      const threshold = 50; // Umbral más alto para diferencias de color
+      const minDiffArea = 10; // Área mínima para considerar una diferencia
+      const diffAreas: Difference[] = [];
+      let currentArea: Difference | null = null;
+      let diffCount = 0;
+
+      for (let y = 0; y < canvas1.height; y += 2) { // Saltamos píxeles para optimizar
+        for (let x = 0; x < canvas1.width; x += 2) {
           const i = (y * canvas1.width + x) * 4;
           const diff = Math.abs(imageData1.data[i] - imageData2.data[i]) +
                       Math.abs(imageData1.data[i + 1] - imageData2.data[i + 1]) +
                       Math.abs(imageData1.data[i + 2] - imageData2.data[i + 2]);
 
           if (diff > threshold) {
+            diffCount++;
             if (!currentArea) {
-              currentArea = { x, y, width: 1, height: 1 };
+              currentArea = { x, y, width: 2, height: 2 };
+            } else if (x - (currentArea.x + currentArea.width) < 5) {
+              // Extendemos el área actual si está cerca
+              currentArea.width = x - currentArea.x + 2;
             } else {
-              currentArea.width = x - currentArea.x + 1;
+              // Agregamos el área actual si es lo suficientemente grande
+              if (currentArea.width * currentArea.height > minDiffArea) {
+                diffAreas.push(currentArea);
+              }
+              currentArea = { x, y, width: 2, height: 2 };
             }
-          } else if (currentArea) {
-            diffAreas.push(currentArea);
+          }
+        }
+
+        if (currentArea) {
+          currentArea.height += 2;
+          if (currentArea.height > 20 || y === canvas1.height - 1) {
+            if (currentArea.width * currentArea.height > minDiffArea) {
+              diffAreas.push(currentArea);
+            }
             currentArea = null;
           }
         }
       }
 
-      // Scale differences to match display size
+      // Agrupamos áreas cercanas
+      const mergedAreas = diffAreas.reduce((acc: Difference[], curr) => {
+        const nearby = acc.find(area =>
+          Math.abs(area.x - curr.x) < 20 &&
+          Math.abs(area.y - curr.y) < 20
+        );
+
+        if (nearby) {
+          nearby.x = Math.min(nearby.x, curr.x);
+          nearby.y = Math.min(nearby.y, curr.y);
+          nearby.width = Math.max(nearby.width, curr.width);
+          nearby.height = Math.max(nearby.height, curr.height);
+          return acc;
+        }
+
+        return [...acc, curr];
+      }, []);
+
+      // Escalamos las diferencias al tamaño de visualización
       const scale = dimensions.width / canvas1.width;
-      setDifferences(diffAreas.map(area => ({
+      setDifferences(mergedAreas.map(area => ({
         x: area.x * scale,
         y: area.y * scale,
         width: area.width * scale,
