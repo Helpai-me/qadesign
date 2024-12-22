@@ -37,7 +37,7 @@ export async function analyzeImageDifferences(
     console.log('Prepared images for analysis');
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4-vision",  // Updated to use the current vision model
       messages: [
         {
           role: "user",

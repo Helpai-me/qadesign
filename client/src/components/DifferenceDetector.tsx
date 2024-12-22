@@ -306,9 +306,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             <PDFDownloadLink
               document={<DifferenceReport differences={differences} />}
               fileName="reporte-diferencias.pdf"
-              className="ml-auto"
             >
-              {({ loading }: { loading: boolean }) => (
+              {({ loading }) => (
                 <Button
                   variant="outline"
                   size="sm"
@@ -324,10 +323,10 @@ export default function DifferenceDetector({ originalImage, implementationImage 
           </div>
 
           <ScrollArea className="h-[400px] pr-4">
-            <AnimatePresence>
-              {differences.map((diff) => (
+            <AnimatePresence mode="sync">
+              {differences.map((diff, index) => (
                 <motion.div
-                  key={diff.id}
+                  key={`${diff.id}-${index}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
