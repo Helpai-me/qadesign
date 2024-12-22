@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquarePlus, MessageSquare, Download } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as React from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { DifferenceReport } from './DifferenceReport';
@@ -25,6 +25,7 @@ interface Comment {
 }
 
 export interface DesignDifference {
+  id: string; // Added unique ID
   type: 'spacing' | 'margin' | 'color' | 'font';
   description: string;
   location: {
@@ -40,7 +41,7 @@ export interface DesignDifference {
 export default function DifferenceDetector({ originalImage, implementationImage }: DifferenceDetectorProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [differences, setDifferences] = useState<DesignDifference[]>([]);
-  const [selectedDifference, setSelectedDifference] = useState<number | null>(null);
+  const [selectedDifference, setSelectedDifference] = useState<string | null>(null); // Changed to string
   const [newComment, setNewComment] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<{
@@ -50,6 +51,46 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     original: null,
     implementation: null,
   });
+
+  const handleImageAnalysis = async (originalImg: HTMLImageElement, implementationImg: HTMLImageElement, containerWidth: number) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = originalImg.width;
+      canvas.height = originalImg.height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(originalImg, 0, 0);
+      const originalBase64 = canvas.toDataURL('image/png');
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(implementationImg, 0, 0);
+      const implementationBase64 = canvas.toDataURL('image/png');
+
+      console.log('Initiating image analysis...');
+      const analysis = await analyzeImageDifferences(originalBase64, implementationBase64);
+      console.log('Analysis completed:', analysis);
+
+      const aiDifferences = analysis.differences.map((diff, index) => ({
+        id: `diff-${Date.now()}-${index}`, // Unique ID for each difference
+        type: diff.type,
+        description: diff.description,
+        location: {
+          x: 0,
+          y: index * 50,
+          width: containerWidth,
+          height: 40,
+        },
+        priority: diff.priority,
+        comments: []
+      }));
+
+      setDifferences(aiDifferences);
+    } catch (error) {
+      console.error('Error in handleImageAnalysis:', error);
+    }
+  };
 
   useEffect(() => {
     const loadImages = async () => {
@@ -72,42 +113,10 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             height: originalImg.height * scale,
           });
 
-          const canvas = document.createElement('canvas');
-          canvas.width = originalImg.width;
-          canvas.height = originalImg.height;
-
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-
-          ctx.drawImage(originalImg, 0, 0);
-          const originalBase64 = canvas.toDataURL('image/png');
-
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(implementationImg, 0, 0);
-          const implementationBase64 = canvas.toDataURL('image/png');
-
-          const analysis = await analyzeImageDifferences(
-            originalBase64,
-            implementationBase64
-          );
-
-          const aiDifferences = analysis.differences.map((diff, index) => ({
-            type: diff.type,
-            description: diff.description,
-            location: {
-              x: 0,
-              y: index * 50,
-              width: containerWidth,
-              height: 40,
-            },
-            priority: diff.priority,
-            comments: []
-          }));
-
-          setDifferences(aiDifferences);
+          await handleImageAnalysis(originalImg, implementationImg, containerWidth);
         }
       } catch (error) {
-        console.error('Error in image processing:', error);
+        console.error('Error loading images:', error);
       }
     };
 
@@ -231,7 +240,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     }
   };
 
-  const addComment = (differenceIndex: number, e: React.MouseEvent) => {
+  const addComment = (differenceId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -239,9 +248,9 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
     setDifferences(prev => {
       const updated = [...prev];
-      if (!updated[differenceIndex].comments) {
-        updated[differenceIndex].comments = [];
-      }
+      const differenceIndex = updated.findIndex(diff => diff.id === differenceId);
+      if (differenceIndex === -1) return updated; // Handle case where difference is not found
+
       updated[differenceIndex].comments.push({
         id: Date.now().toString(),
         text: newComment,
@@ -266,11 +275,11 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                   height={dimensions.height}
                 />
               )}
-              {differences.map((diff, i) => {
-                const colors = getColorForDifference(diff.type, diff.priority, i === selectedDifference);
+              {differences.map((diff) => {
+                const colors = getColorForDifference(diff.type, diff.priority, diff.id === selectedDifference);
                 return (
                   <Rect
-                    key={i}
+                    key={diff.id}
                     x={diff.location.x}
                     y={diff.location.y}
                     width={diff.location.width}
@@ -278,13 +287,10 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                     fill={colors.fill}
                     stroke={colors.stroke}
                     strokeWidth={1.5}
-                    onClick={(e) => {
-                      e.cancelBubble = true;
-                      setSelectedDifference(i);
-                    }}
-                    opacity={i === selectedDifference ? 0.8 : 0.3}
+                    onClick={() => setSelectedDifference(diff.id)}
+                    opacity={diff.id === selectedDifference ? 0.8 : 0.3}
                     shadowColor="rgba(0,0,0,0.3)"
-                    shadowBlur={i === selectedDifference ? 10 : 0}
+                    shadowBlur={diff.id === selectedDifference ? 10 : 0}
                     shadowOpacity={0.5}
                     perfectDrawEnabled={false}
                   />
@@ -302,12 +308,11 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               fileName="reporte-diferencias.pdf"
               className="ml-auto"
             >
-              {({ loading, url }) => (
+              {({ loading }) => (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={loading || differences.length === 0}
-                  asChild={!!url}
                 >
                   <span className="flex items-center">
                     <Download className="h-4 w-4 mr-2" />
@@ -317,120 +322,121 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               )}
             </PDFDownloadLink>
           </div>
+
           <ScrollArea className="h-[400px] pr-4">
-            {differences.map((diff, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.2,
-                  delay: index * 0.05
-                }}
-              >
-                <div
-                  className={`mb-4 border rounded-lg transition-all duration-200 ease-in-out
-                    ${index === selectedDifference
+            <AnimatePresence>
+              {differences.map((diff) => (
+                <motion.div
+                  key={diff.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div
+                    className={`mb-4 border rounded-lg transition-all duration-200 ease-in-out
+                    ${diff.id === selectedDifference
                       ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500 scale-102 shadow-sm'
                       : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
-                >
-                  <div 
-                    className="p-3 cursor-pointer"
-                    onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
                   >
-                    <div className="flex items-center gap-2">
-                      <motion.div
-                        className={`w-2 h-2 rounded-full ${
-                          diff.type === 'spacing' ? 'bg-green-500' :
-                          diff.type === 'margin' ? 'bg-green-600' :
-                          'bg-blue-500'
-                        }`}
-                        animate={{
-                          scale: index === selectedDifference ? 1.2 : 1
-                        }}
-                        transition={{ duration: 0.2 }}
-                      />
-                      <span className="text-sm flex-grow">{diff.description}</span>
-                      {diff.priority === 'high' && (
-                        <motion.span
-                          className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full"
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
+                    <div
+                      className="p-3 cursor-pointer"
+                      onClick={() => setSelectedDifference(diff.id === selectedDifference ? null : diff.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <motion.div
+                          className={`w-2 h-2 rounded-full ${
+                            diff.type === 'spacing' ? 'bg-green-500' :
+                            diff.type === 'margin' ? 'bg-green-600' :
+                            'bg-blue-500'
+                          }`}
+                          animate={{
+                            scale: diff.id === selectedDifference ? 1.2 : 1
+                          }}
                           transition={{ duration: 0.2 }}
-                        >
-                          Alta prioridad
-                        </motion.span>
-                      )}
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="ml-2"
-                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="text-sm flex-grow">{diff.description}</span>
+                        {diff.priority === 'high' && (
+                          <motion.span
+                            className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2 }}
                           >
-                            {diff.comments?.length > 0 ? (
-                              <MessageSquare className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <MessageSquarePlus className="h-4 w-4 text-gray-500" />
-                            )}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Comentarios</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <ScrollArea className="h-[200px] w-full pr-4">
-                              {diff.comments?.map((comment, i) => (
-                                <motion.div
-                                  key={comment.id}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{ delay: i * 0.1 }}
-                                  className="mb-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
-                                >
-                                  <p className="text-sm">{comment.text}</p>
-                                  <span className="text-xs text-gray-500 mt-1 block">
-                                    {comment.timestamp}
-                                  </span>
-                                </motion.div>
-                              ))}
-                            </ScrollArea>
-                            <div className="flex gap-2">
-                              <Textarea
-                                placeholder="Añadir un comentario..."
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                className="min-h-[80px]"
-                              />
-                            </div>
+                            Alta prioridad
+                          </motion.span>
+                        )}
+                        <Dialog>
+                          <DialogTrigger asChild>
                             <Button
-                              onClick={(e) => addComment(index, e)}
-                              className="w-full"
-                              disabled={!newComment.trim()}
+                              variant="ghost"
+                              size="icon"
+                              className="ml-2"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              Añadir Comentario
+                              {diff.comments?.length > 0 ? (
+                                <MessageSquare className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <MessageSquarePlus className="h-4 w-4 text-gray-500" />
+                              )}
                             </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Comentarios</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <ScrollArea className="h-[200px] w-full pr-4">
+                                {diff.comments?.map((comment) => (
+                                  <motion.div
+                                    key={comment.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.1 }}
+                                    className="mb-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                                  >
+                                    <p className="text-sm">{comment.text}</p>
+                                    <span className="text-xs text-gray-500 mt-1 block">
+                                      {comment.timestamp}
+                                    </span>
+                                  </motion.div>
+                                ))}
+                              </ScrollArea>
+                              <div className="flex gap-2">
+                                <Textarea
+                                  placeholder="Añadir un comentario..."
+                                  value={newComment}
+                                  onChange={(e) => setNewComment(e.target.value)}
+                                  className="min-h-[80px]"
+                                />
+                              </div>
+                              <Button
+                                onClick={(e) => addComment(diff.id, e)}
+                                className="w-full"
+                                disabled={!newComment.trim()}
+                              >
+                                Añadir Comentario
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </div>
+                    {diff.comments?.length > 0 && (
+                      <div className="px-3 pb-3">
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="text-xs text-gray-500"
+                        >
+                          {diff.comments.length} comentario(s)
+                        </motion.div>
+                      </div>
+                    )}
                   </div>
-                  {diff.comments?.length > 0 && (
-                    <div className="px-3 pb-3">
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="text-xs text-gray-500"
-                      >
-                        {diff.comments.length} comentario(s)
-                      </motion.div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </ScrollArea>
         </Card>
       </div>
