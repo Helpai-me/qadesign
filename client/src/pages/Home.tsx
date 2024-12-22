@@ -5,6 +5,7 @@ import ImageComparison from "@/components/ImageComparison";
 import ImageUploader from "@/components/ImageUploader";
 import MeasurementTools from "@/components/MeasurementTools";
 import ContrastChecker from "@/components/ContrastChecker";
+import DifferenceDetector from "@/components/DifferenceDetector";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -47,6 +48,7 @@ export default function Home() {
               <TabsTrigger value="comparison">Comparison</TabsTrigger>
               <TabsTrigger value="measurement">Measurement</TabsTrigger>
               <TabsTrigger value="contrast">Contrast</TabsTrigger>
+              <TabsTrigger value="differences">Differences</TabsTrigger>
             </TabsList>
 
             <TabsContent value="comparison">
@@ -72,6 +74,17 @@ export default function Home() {
               <Card>
                 <CardContent className="p-6">
                   <ContrastChecker image={implementationImage} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="differences">
+              <Card>
+                <CardContent className="p-6">
+                  <DifferenceDetector
+                    originalImage={originalImage}
+                    implementationImage={implementationImage}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
