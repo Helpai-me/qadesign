@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Line, Text } from 'react-konva';
+import { Stage, Layer, Line, Text, Image } from 'react-konva';
 import { Button } from '@/components/ui/button';
 import { Ruler, Move } from 'lucide-react';
 import { loadImage } from '@/lib/imageProcessing';
+import * as React from 'react';
 
 interface MeasurementToolsProps {
   image: string;
@@ -114,22 +115,20 @@ export default function MeasurementTools({ image }: MeasurementToolsProps) {
               />
             )}
             {measurements.map((measurement, i) => (
-              <>
+              <React.Fragment key={i}>
                 <Line
-                  key={`line-${i}`}
                   points={measurement.points}
                   stroke="#00ff00"
                   strokeWidth={2}
                 />
                 <Text
-                  key={`text-${i}`}
                   x={(measurement.points[0] + measurement.points[2]) / 2}
                   y={(measurement.points[1] + measurement.points[3]) / 2}
                   text={`${Math.round(measurement.distance)}px`}
                   fill="#00ff00"
                   fontSize={14}
                 />
-              </>
+              </React.Fragment>
             ))}
           </Layer>
         </Stage>
