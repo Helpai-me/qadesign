@@ -72,6 +72,26 @@ export default function Home() {
           </Card>
         </motion.div>
 
+        {/* Mostrar la imagen original inmediatamente */}
+        {originalImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="mb-8"
+          >
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Diseño Original</h3>
+                <div className="border rounded-lg overflow-hidden">
+                  <img src={originalImage} alt="Original design" className="w-full h-auto" />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Mostrar herramientas de comparación solo cuando ambas imágenes estén presentes */}
         {originalImage && implementationImage && (
           <motion.div
             initial={{ opacity: 0 }}
