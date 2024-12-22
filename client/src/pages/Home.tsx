@@ -8,6 +8,7 @@ import ContrastChecker from "@/components/ContrastChecker";
 import DifferenceDetector from "@/components/DifferenceDetector";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SideBySideComparison from "@/components/SideBySideComparison";
 
 export default function Home() {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -45,16 +46,28 @@ export default function Home() {
         {originalImage && implementationImage && (
           <Tabs defaultValue="comparison" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="comparison">Comparison</TabsTrigger>
-              <TabsTrigger value="measurement">Measurement</TabsTrigger>
-              <TabsTrigger value="contrast">Contrast</TabsTrigger>
-              <TabsTrigger value="differences">Differences</TabsTrigger>
+              <TabsTrigger value="comparison">Comparación</TabsTrigger>
+              <TabsTrigger value="sideBySide">Lado a Lado</TabsTrigger>
+              <TabsTrigger value="measurement">Medición</TabsTrigger>
+              <TabsTrigger value="contrast">Contraste</TabsTrigger>
+              <TabsTrigger value="differences">Diferencias</TabsTrigger>
             </TabsList>
 
             <TabsContent value="comparison">
               <Card>
                 <CardContent className="p-6">
                   <ImageComparison
+                    originalImage={originalImage}
+                    implementationImage={implementationImage}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="sideBySide">
+              <Card>
+                <CardContent className="p-6">
+                  <SideBySideComparison
                     originalImage={originalImage}
                     implementationImage={implementationImage}
                   />
