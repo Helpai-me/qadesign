@@ -10,7 +10,7 @@ interface DifferenceDetectorProps {
 }
 
 interface DesignDifference {
-  type: 'spacing' | 'color' | 'typography' | 'margin';
+  type: 'spacing' | 'margin';
   description: string;
   location: {
     x: number;
@@ -58,7 +58,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
   }, [originalImage, implementationImage]);
 
   useEffect(() => {
-    const analyzeDesignDifferences = () => {
+    const analyzeSpacingDifferences = () => {
       if (!images.original || !images.implementation) return;
 
       const canvas1 = document.createElement('canvas');
@@ -81,69 +81,60 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
       const designDifferences: DesignDifference[] = [];
 
-      // Analizar diferencias de color
-      const colorThreshold = 30;
-      for (let y = 0; y < canvas1.height; y += 20) {
-        for (let x = 0; x < canvas1.width; x += 20) {
-          const i = (y * canvas1.width + x) * 4;
-          const colorDiff = Math.abs(imageData1.data[i] - imageData2.data[i]) +
-                         Math.abs(imageData1.data[i + 1] - imageData2.data[i + 1]) +
-                         Math.abs(imageData1.data[i + 2] - imageData2.data[i + 2]);
-
-          if (colorDiff > colorThreshold * 3) {
-            const color1 = `rgb(${imageData1.data[i]}, ${imageData1.data[i + 1]}, ${imageData1.data[i + 2]})`;
-            const color2 = `rgb(${imageData2.data[i]}, ${imageData2.data[i + 1]}, ${imageData2.data[i + 2]})`;
-
-            designDifferences.push({
-              type: 'color',
-              description: `Color difiere: ${color1} vs ${color2}`,
-              location: {
-                x: x * dimensions.width / canvas1.width,
-                y: y * dimensions.height / canvas1.height,
-                width: 40,
-                height: 40
-              }
-            });
-          }
-        }
-      }
-
       // Analizar diferencias de espaciado
-      const spacingThreshold = 5;
+      const spacingThreshold = 16; // Aumentado para ser más selectivo
       let whitespaceRegions1 = detectWhitespaceRegions(imageData1, canvas1.width, canvas1.height);
       let whitespaceRegions2 = detectWhitespaceRegions(imageData2, canvas2.width, canvas2.height);
 
-      for (let i = 0; i < whitespaceRegions1.length; i++) {
+      // Filtrar regiones pequeñas
+      whitespaceRegions1 = whitespaceRegions1.filter(r => r.width > 20);
+      whitespaceRegions2 = whitespaceRegions2.filter(r => r.width > 20);
+
+      // Comparar solo las regiones más significativas
+      for (let i = 0; i < Math.min(whitespaceRegions1.length, whitespaceRegions2.length); i++) {
         const region1 = whitespaceRegions1[i];
         const region2 = whitespaceRegions2[i];
 
-        if (region2 && Math.abs(region1.width - region2.width) > spacingThreshold) {
+        if (Math.abs(region1.width - region2.width) > spacingThreshold) {
           designDifferences.push({
             type: 'spacing',
-            description: `Espaciado inconsistente: ${Math.abs(region1.width - region2.width)}px de diferencia`,
+            description: `Espaciado inconsistente en ${region1.y * dimensions.height / canvas1.height}px desde el tope (${Math.abs(region1.width - region2.width)}px vs ${region2.width}px)`,
             location: {
               x: region1.x * dimensions.width / canvas1.width,
               y: region1.y * dimensions.height / canvas1.height,
-              width: region1.width * dimensions.width / canvas1.width,
-              height: 20
+              width: Math.max(region1.width, region2.width) * dimensions.width / canvas1.width,
+              height: 40
             }
           });
         }
       }
 
-      // Analizar márgenes
-      const marginThreshold = 8;
+      // Analizar márgenes laterales
       const margins1 = detectMargins(imageData1, canvas1.width, canvas1.height);
       const margins2 = detectMargins(imageData2, canvas2.width, canvas2.height);
+      const marginThreshold = 16; // Aumentado para ser más selectivo
 
       if (Math.abs(margins1.left - margins2.left) > marginThreshold) {
         designDifferences.push({
           type: 'margin',
-          description: `Margen izquierdo inconsistente: ${Math.abs(margins1.left - margins2.left)}px de diferencia`,
+          description: `Margen izquierdo inconsistente (${margins1.left}px vs ${margins2.left}px)`,
           location: {
             x: 0,
             y: 0,
-            width: 20,
+            width: Math.max(margins1.left, margins2.left) * dimensions.width / canvas1.width,
+            height: dimensions.height
+          }
+        });
+      }
+
+      if (Math.abs(margins1.right - margins2.right) > marginThreshold) {
+        designDifferences.push({
+          type: 'margin',
+          description: `Margen derecho inconsistente (${canvas1.width - margins1.right}px vs ${canvas2.width - margins2.right}px)`,
+          location: {
+            x: Math.min(margins1.right, margins2.right) * dimensions.width / canvas1.width,
+            y: 0,
+            width: dimensions.width - Math.min(margins1.right, margins2.right) * dimensions.width / canvas1.width,
             height: dimensions.height
           }
         });
@@ -153,30 +144,37 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     };
 
     if (images.original && images.implementation && dimensions.width > 0) {
-      analyzeDesignDifferences();
+      analyzeSpacingDifferences();
     }
   }, [images, dimensions]);
 
   const detectWhitespaceRegions = (imageData: ImageData, width: number, height: number) => {
     const regions = [];
-    for (let y = 0; y < height; y += 20) {
+    // Analizar cada 40 píxeles para reducir el ruido
+    for (let y = 0; y < height; y += 40) {
       let start = null;
+      let whiteCount = 0;
+
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
-        const isWhite = imageData.data[i] > 250 && 
-                       imageData.data[i + 1] > 250 && 
-                       imageData.data[i + 2] > 250;
+        const isWhite = imageData.data[i] > 240 && 
+                       imageData.data[i + 1] > 240 && 
+                       imageData.data[i + 2] > 240;
 
-        if (isWhite && start === null) {
-          start = x;
-        } else if (!isWhite && start !== null) {
-          regions.push({
-            x: start,
-            y,
-            width: x - start,
-            height: 1
-          });
+        if (isWhite) {
+          whiteCount++;
+          if (start === null) start = x;
+        } else {
+          if (start !== null && whiteCount > 20) { // Solo considerar espacios blancos significativos
+            regions.push({
+              x: start,
+              y,
+              width: x - start,
+              height: 40
+            });
+          }
           start = null;
+          whiteCount = 0;
         }
       }
     }
@@ -186,22 +184,25 @@ export default function DifferenceDetector({ originalImage, implementationImage 
   const detectMargins = (imageData: ImageData, width: number, height: number) => {
     let left = width;
     let right = 0;
-    let top = height;
-    let bottom = 0;
+    let contentFound = false;
 
-    for (let y = 0; y < height; y++) {
+    // Analizar solo los bordes laterales
+    for (let y = 0; y < height; y += 2) { // Saltar píxeles para optimizar
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
-        if (imageData.data[i + 3] > 0) { // Si no es transparente
+        const hasContent = imageData.data[i] < 240 || 
+                          imageData.data[i + 1] < 240 || 
+                          imageData.data[i + 2] < 240;
+
+        if (hasContent) {
+          contentFound = true;
           left = Math.min(left, x);
           right = Math.max(right, x);
-          top = Math.min(top, y);
-          bottom = Math.max(bottom, y);
         }
       }
     }
 
-    return { left, right, top, bottom };
+    return contentFound ? { left, right } : { left: 0, right: width };
   };
 
   return (
@@ -224,8 +225,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                   y={diff.location.y}
                   width={diff.location.width}
                   height={diff.location.height}
-                  fill="rgba(255, 0, 0, 0.1)"
-                  stroke="rgba(255, 0, 0, 0.3)"
+                  fill={diff.type === 'spacing' ? "rgba(59, 130, 246, 0.1)" : "rgba(34, 197, 94, 0.1)"}
+                  stroke={diff.type === 'spacing' ? "rgba(59, 130, 246, 0.3)" : "rgba(34, 197, 94, 0.3)"}
                   strokeWidth={1}
                 />
               ))}
@@ -243,10 +244,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
-                    diff.type === 'color' ? 'bg-red-500' :
-                    diff.type === 'spacing' ? 'bg-blue-500' :
-                    diff.type === 'margin' ? 'bg-green-500' :
-                    'bg-purple-500'
+                    diff.type === 'spacing' ? 'bg-blue-500' : 'bg-green-500'
                   }`} />
                   <span className="text-sm">{diff.description}</span>
                 </div>
