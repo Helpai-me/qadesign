@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Image, Rect } from 'react-konva';
 import { loadImage } from '@/lib/imageProcessing';
+import { analyzeImageDifferences } from '@/lib/geminiService';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -70,159 +71,53 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             width: containerWidth,
             height: originalImg.height * scale,
           });
+
+          // Convert images to base64 for Gemini API
+          const canvas = document.createElement('canvas');
+          canvas.width = originalImg.width;
+          canvas.height = originalImg.height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
+          // Get base64 for original image
+          ctx.drawImage(originalImg, 0, 0);
+          const originalBase64 = canvas.toDataURL('image/png');
+
+          // Get base64 for implementation image
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(implementationImg, 0, 0);
+          const implementationBase64 = canvas.toDataURL('image/png');
+
+          // Analyze differences using Gemini
+          const analysis = await analyzeImageDifferences(
+            originalBase64,
+            implementationBase64
+          );
+
+          // Convert Gemini analysis to our difference format
+          const aiDifferences = analysis.differences.map((diff, index) => ({
+            type: diff.type,
+            description: diff.description,
+            location: {
+              x: 0,
+              y: index * 50, // Stack differences vertically
+              width: containerWidth,
+              height: 40,
+            },
+            priority: diff.priority,
+            comments: []
+          }));
+
+          setDifferences(aiDifferences);
         }
       } catch (error) {
-        console.error('Error loading images:', error);
+        console.error('Error in image processing:', error);
       }
     };
 
     loadImages();
   }, [originalImage, implementationImage]);
-
-  useEffect(() => {
-    const analyzeDesignDifferences = () => {
-      if (!images.original || !images.implementation) return;
-
-      const canvas1 = document.createElement('canvas');
-      const canvas2 = document.createElement('canvas');
-      const ctx1 = canvas1.getContext('2d');
-      const ctx2 = canvas2.getContext('2d');
-
-      if (!ctx1 || !ctx2) return;
-
-      canvas1.width = images.original.width;
-      canvas1.height = images.original.height;
-      canvas2.width = images.implementation.width;
-      canvas2.height = images.implementation.height;
-
-      ctx1.drawImage(images.original, 0, 0);
-      ctx2.drawImage(images.implementation, 0, 0);
-
-      const imageData1 = ctx1.getImageData(0, 0, canvas1.width, canvas1.height);
-      const imageData2 = ctx2.getImageData(0, 0, canvas2.width, canvas2.height);
-
-      const designDifferences: DesignDifference[] = [];
-
-      // Analizar diferencias de espaciado significativas
-      const spacingThreshold = 16;
-      let whitespaceRegions1 = detectWhitespaceRegions(imageData1, canvas1.width, canvas1.height);
-      let whitespaceRegions2 = detectWhitespaceRegions(imageData2, canvas2.width, canvas2.height);
-
-      // Filtrar regiones pequeñas y agrupar regiones cercanas
-      whitespaceRegions1 = whitespaceRegions1
-        .filter(r => r.width > 20)
-        .reduce((acc, curr) => {
-          const similar = acc.find(r =>
-            Math.abs(r.y - curr.y) < 40 &&
-            Math.abs(r.width - curr.width) < 20
-          );
-          if (similar) {
-            similar.width = Math.max(similar.width, curr.width);
-            return acc;
-          }
-          return [...acc, curr];
-        }, [] as any[]);
-
-      whitespaceRegions2 = whitespaceRegions2
-        .filter(r => r.width > 20)
-        .reduce((acc, curr) => {
-          const similar = acc.find(r =>
-            Math.abs(r.y - curr.y) < 40 &&
-            Math.abs(r.width - curr.width) < 20
-          );
-          if (similar) {
-            similar.width = Math.max(similar.width, curr.width);
-            return acc;
-          }
-          return [...acc, curr];
-        }, [] as any[]);
-
-      // Detectar diferencias de espaciado significativas
-      for (let i = 0; i < Math.min(whitespaceRegions1.length, whitespaceRegions2.length); i++) {
-        const region1 = whitespaceRegions1[i];
-        const region2 = whitespaceRegions2[i];
-
-        if (Math.abs(region1.width - region2.width) > spacingThreshold) {
-          designDifferences.push({
-            type: 'spacing',
-            description: `Ajustar espaciado horizontal: ${Math.abs(region1.width - region2.width)}px de diferencia`,
-            location: {
-              x: region1.x * dimensions.width / canvas1.width,
-              y: region1.y * dimensions.height / canvas1.height,
-              width: Math.max(region1.width, region2.width) * dimensions.width / canvas1.width,
-              height: 40
-            },
-            priority: Math.abs(region1.width - region2.width) > 32 ? 'high' : 'medium',
-            comments: []
-          });
-        }
-      }
-
-      // Analizar márgenes laterales
-      const margins1 = detectMargins(imageData1, canvas1.width, canvas1.height);
-      const margins2 = detectMargins(imageData2, canvas2.width, canvas2.height);
-      const marginThreshold = 16;
-
-      if (Math.abs(margins1.left - margins2.left) > marginThreshold) {
-        designDifferences.push({
-          type: 'margin',
-          description: `Corregir margen izquierdo: diferencia de ${Math.abs(margins1.left - margins2.left)}px`,
-          location: {
-            x: 0,
-            y: 0,
-            width: Math.max(margins1.left, margins2.left) * dimensions.width / canvas1.width,
-            height: dimensions.height
-          },
-          priority: 'high',
-          comments: []
-        });
-      }
-
-      // Detectar diferencias de color significativas
-      const colorDifferences = detectColorDifferences(imageData1, imageData2, canvas1.width, canvas1.height);
-      colorDifferences.forEach(diff => {
-        designDifferences.push({
-          type: 'color',
-          description: `Actualizar color: de ${diff.color1} a ${diff.color2}`,
-          location: {
-            x: diff.x * dimensions.width / canvas1.width,
-            y: diff.y * dimensions.height / canvas1.height,
-            width: 100,
-            height: 40
-          },
-          priority: 'medium',
-          comments: []
-        });
-      });
-
-      // Agrupar diferencias similares y eliminar duplicados
-      const groupedDifferences = designDifferences.reduce((acc: DesignDifference[], curr) => {
-        const similarDiff = acc.find(diff =>
-          diff.type === curr.type &&
-          Math.abs(diff.location.y - curr.location.y) < 100 &&
-          Math.abs(curr.location.width - curr.location.width) < 20
-        );
-
-        if (similarDiff) {
-          similarDiff.location = {
-            x: Math.min(similarDiff.location.x, curr.location.x),
-            y: Math.min(similarDiff.location.y, curr.location.y),
-            width: Math.max(similarDiff.location.width, curr.location.width),
-            height: Math.max(similarDiff.location.height, curr.location.height)
-          };
-          return acc;
-        }
-
-        return [...acc, curr];
-      }, []);
-
-      setDifferences(groupedDifferences);
-    };
-
-    if (images.original && images.implementation && dimensions.width > 0) {
-      analyzeDesignDifferences();
-    }
-  }, [images, dimensions]);
 
   const detectWhitespaceRegions = (imageData: ImageData, width: number, height: number) => {
     const regions = [];
@@ -413,7 +308,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               fileName="reporte-diferencias.pdf"
               className="ml-auto"
             >
-              {({ loading }) => (
+              {({ loading }: { loading: boolean }) => (
                 <Button
                   variant="outline"
                   size="sm"
