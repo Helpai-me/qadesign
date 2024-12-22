@@ -3,6 +3,7 @@ import { Stage, Layer, Image, Rect } from 'react-konva';
 import { loadImage } from '@/lib/imageProcessing';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { motion } from 'framer-motion'; // Import for motion animations
 
 interface DifferenceDetectorProps {
   originalImage: string;
@@ -92,8 +93,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       whitespaceRegions1 = whitespaceRegions1
         .filter(r => r.width > 20)
         .reduce((acc, curr) => {
-          const similar = acc.find(r => 
-            Math.abs(r.y - curr.y) < 40 && 
+          const similar = acc.find(r =>
+            Math.abs(r.y - curr.y) < 40 &&
             Math.abs(r.width - curr.width) < 20
           );
           if (similar) {
@@ -106,8 +107,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       whitespaceRegions2 = whitespaceRegions2
         .filter(r => r.width > 20)
         .reduce((acc, curr) => {
-          const similar = acc.find(r => 
-            Math.abs(r.y - curr.y) < 40 && 
+          const similar = acc.find(r =>
+            Math.abs(r.y - curr.y) < 40 &&
             Math.abs(r.width - curr.width) < 20
           );
           if (similar) {
@@ -174,7 +175,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
       // Agrupar diferencias similares y eliminar duplicados
       const groupedDifferences = designDifferences.reduce((acc: DesignDifference[], curr) => {
-        const similarDiff = acc.find(diff => 
+        const similarDiff = acc.find(diff =>
           diff.type === curr.type &&
           Math.abs(diff.location.y - curr.location.y) < 100 &&
           Math.abs(curr.location.width - curr.location.width) < 20
@@ -279,8 +280,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
     // Agrupar diferencias de color cercanas
     return differences.reduce((acc, curr) => {
-      const similar = acc.find(d => 
-        Math.abs(d.x - curr.x) < 50 && 
+      const similar = acc.find(d =>
+        Math.abs(d.x - curr.x) < 50 &&
         Math.abs(d.y - curr.y) < 50 &&
         d.color1 === curr.color1 &&
         d.color2 === curr.color2
@@ -345,6 +346,12 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                     stroke={colors.stroke}
                     strokeWidth={1.5}
                     onClick={() => setSelectedDifference(i)}
+                    // Añadir transiciones suaves con Konva
+                    opacity={i === selectedDifference ? 0.8 : 0.3}
+                    shadowColor="rgba(0,0,0,0.3)"
+                    shadowBlur={i === selectedDifference ? 10 : 0}
+                    shadowOpacity={0.5}
+                    perfectDrawEnabled={false}
                   />
                 );
               })}
@@ -356,28 +363,48 @@ export default function DifferenceDetector({ originalImage, implementationImage 
           <h3 className="font-semibold mb-2">Diferencias Detectadas</h3>
           <ScrollArea className="h-[400px] pr-4">
             {differences.map((diff, index) => (
-              <div
+              <motion.div
                 key={index}
-                className={`mb-2 p-2 border rounded-lg transition-colors cursor-pointer
-                  ${index === selectedDifference 
-                    ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500' 
-                    : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
-                onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.2,
+                  delay: index * 0.05
+                }}
               >
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    diff.type === 'spacing' ? 'bg-green-500' : 
-                    diff.type === 'margin' ? 'bg-green-600' :
-                    'bg-blue-500'
-                  }`} />
-                  <span className="text-sm">{diff.description}</span>
-                  {diff.priority === 'high' && (
-                    <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full ml-auto">
-                      Alta prioridad
-                    </span>
-                  )}
+                <div
+                  className={`mb-2 p-2 border rounded-lg transition-all duration-200 ease-in-out cursor-pointer
+                    ${index === selectedDifference
+                      ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500 scale-102 shadow-sm'
+                      : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
+                  onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
+                >
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      className={`w-2 h-2 rounded-full ${
+                        diff.type === 'spacing' ? 'bg-green-500' :
+                        diff.type === 'margin' ? 'bg-green-600' :
+                        'bg-blue-500'
+                      }`}
+                      animate={{
+                        scale: index === selectedDifference ? 1.2 : 1
+                      }}
+                      transition={{ duration: 0.2 }}
+                    />
+                    <span className="text-sm">{diff.description}</span>
+                    {diff.priority === 'high' && (
+                      <motion.span
+                        className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full ml-auto"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        Alta prioridad
+                      </motion.span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </ScrollArea>
         </Card>
