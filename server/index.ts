@@ -60,7 +60,7 @@ const findAvailablePort = async (startPort: number, maxAttempts: number = 20): P
 
         server.once('listening', () => {
           const address = server.address() as AddressInfo;
-          log(`Puerto ${address.port} disponible`);
+          log(`Puerto ${port} disponible`);
           server.close(() => resolve());
         });
 
@@ -108,7 +108,7 @@ const findAvailablePort = async (startPort: number, maxAttempts: number = 20): P
     server.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE') {
         log(`Error: Puerto ${port} ya está en uso`);
-        process.exit(1);
+        //Removed process.exit(1);
       } else {
         log(`Error del servidor: ${error.message}`);
         throw error;
