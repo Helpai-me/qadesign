@@ -3,11 +3,21 @@ import { Stage, Layer, Image, Rect } from 'react-konva';
 import { loadImage } from '@/lib/imageProcessing';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { motion } from 'framer-motion'; // Import for motion animations
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { MessageSquarePlus, MessageSquare } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface DifferenceDetectorProps {
   originalImage: string;
   implementationImage: string;
+}
+
+interface Comment {
+  id: string;
+  text: string;
+  timestamp: string;
 }
 
 interface DesignDifference {
@@ -20,12 +30,14 @@ interface DesignDifference {
     height: number;
   };
   priority: 'high' | 'medium' | 'low';
+  comments: Comment[];
 }
 
 export default function DifferenceDetector({ originalImage, implementationImage }: DifferenceDetectorProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [differences, setDifferences] = useState<DesignDifference[]>([]);
   const [selectedDifference, setSelectedDifference] = useState<number | null>(null);
+  const [newComment, setNewComment] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<{
     original: HTMLImageElement | null;
@@ -133,7 +145,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
               width: Math.max(region1.width, region2.width) * dimensions.width / canvas1.width,
               height: 40
             },
-            priority: Math.abs(region1.width - region2.width) > 32 ? 'high' : 'medium'
+            priority: Math.abs(region1.width - region2.width) > 32 ? 'high' : 'medium',
+            comments: []
           });
         }
       }
@@ -153,7 +166,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             width: Math.max(margins1.left, margins2.left) * dimensions.width / canvas1.width,
             height: dimensions.height
           },
-          priority: 'high'
+          priority: 'high',
+          comments: []
         });
       }
 
@@ -169,7 +183,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             width: 100,
             height: 40
           },
-          priority: 'medium'
+          priority: 'medium',
+          comments: []
         });
       });
 
@@ -320,6 +335,22 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     }
   };
 
+  const addComment = (differenceIndex: number) => {
+    if (!newComment.trim()) return;
+
+    setDifferences(prev => {
+      const updated = [...prev];
+      updated[differenceIndex].comments.push({
+        id: Date.now().toString(),
+        text: newComment,
+        timestamp: new Date().toLocaleString()
+      });
+      return updated;
+    });
+
+    setNewComment('');
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -346,7 +377,6 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                     stroke={colors.stroke}
                     strokeWidth={1.5}
                     onClick={() => setSelectedDifference(i)}
-                    // Añadir transiciones suaves con Konva
                     opacity={i === selectedDifference ? 0.8 : 0.3}
                     shadowColor="rgba(0,0,0,0.3)"
                     shadowBlur={i === selectedDifference ? 10 : 0}
@@ -373,36 +403,105 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                 }}
               >
                 <div
-                  className={`mb-2 p-2 border rounded-lg transition-all duration-200 ease-in-out cursor-pointer
+                  className={`mb-4 border rounded-lg transition-all duration-200 ease-in-out
                     ${index === selectedDifference
                       ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500 scale-102 shadow-sm'
                       : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
-                  onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
                 >
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      className={`w-2 h-2 rounded-full ${
-                        diff.type === 'spacing' ? 'bg-green-500' :
-                        diff.type === 'margin' ? 'bg-green-600' :
-                        'bg-blue-500'
-                      }`}
-                      animate={{
-                        scale: index === selectedDifference ? 1.2 : 1
-                      }}
-                      transition={{ duration: 0.2 }}
-                    />
-                    <span className="text-sm">{diff.description}</span>
-                    {diff.priority === 'high' && (
-                      <motion.span
-                        className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full ml-auto"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
+                  <div 
+                    className="p-3 cursor-pointer"
+                    onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <motion.div
+                        className={`w-2 h-2 rounded-full ${
+                          diff.type === 'spacing' ? 'bg-green-500' :
+                          diff.type === 'margin' ? 'bg-green-600' :
+                          'bg-blue-500'
+                        }`}
+                        animate={{
+                          scale: index === selectedDifference ? 1.2 : 1
+                        }}
                         transition={{ duration: 0.2 }}
-                      >
-                        Alta prioridad
-                      </motion.span>
-                    )}
+                      />
+                      <span className="text-sm flex-grow">{diff.description}</span>
+                      {diff.priority === 'high' && (
+                        <motion.span
+                          className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          Alta prioridad
+                        </motion.span>
+                      )}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ml-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {diff.comments?.length > 0 ? (
+                              <MessageSquare className="h-4 w-4 text-blue-500" />
+                            ) : (
+                              <MessageSquarePlus className="h-4 w-4 text-gray-500" />
+                            )}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Comentarios</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <ScrollArea className="h-[200px] w-full pr-4">
+                              {diff.comments?.map((comment, i) => (
+                                <motion.div
+                                  key={comment.id}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: i * 0.1 }}
+                                  className="mb-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                                >
+                                  <p className="text-sm">{comment.text}</p>
+                                  <span className="text-xs text-gray-500 mt-1 block">
+                                    {comment.timestamp}
+                                  </span>
+                                </motion.div>
+                              ))}
+                            </ScrollArea>
+                            <div className="flex gap-2">
+                              <Textarea
+                                placeholder="Añadir un comentario..."
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                className="min-h-[80px]"
+                              />
+                            </div>
+                            <Button
+                              onClick={() => addComment(index)}
+                              className="w-full"
+                              disabled={!newComment.trim()}
+                            >
+                              Añadir Comentario
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
+                  {diff.comments?.length > 0 && (
+                    <div className="px-3 pb-3">
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="text-xs text-gray-500"
+                      >
+                        {diff.comments.length} comentario(s)
+                      </motion.div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
