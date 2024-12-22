@@ -44,13 +44,19 @@ export async function analyzeImageDifferences(
           content: [
             {
               type: "text",
-              text: `Compare these two UI design images and list their visual differences.
-              For each difference found, provide:
-              1. Type: either 'spacing', 'margin', 'color', or 'font'
-              2. Description: explain the difference in Spanish
-              3. Priority: 'high', 'medium', or 'low' based on visual impact
+              text: `Analiza las diferencias visuales entre estas dos imágenes de interfaz de usuario.
+              Para cada diferencia encontrada, proporciona:
+              1. Tipo: solo uno de estos: 'spacing', 'margin', 'color', o 'font'
+              2. Descripción: explica la diferencia en español
+              3. Prioridad: 'high', 'medium', o 'low' basado en el impacto visual
 
-              Format the response as a JSON object with a 'differences' array.`
+              Notas importantes:
+              - Agrupa diferencias similares
+              - Solo reporta diferencias significativas
+              - Enfócate en espaciado, márgenes, colores y fuentes
+              - Máximo 5 diferencias en total
+
+              Formatea la respuesta como un objeto JSON con un array 'differences'.`
             },
             {
               type: "image_url",
@@ -91,8 +97,19 @@ export async function analyzeImageDifferences(
       };
     }
 
+    // Agrupar diferencias similares y limitar a 5
+    const groupedDifferences = result.differences.reduce((acc: any[], curr: any) => {
+      const similar = acc.find(d => 
+        d.type === curr.type && 
+        d.description.toLowerCase().includes(curr.description.toLowerCase())
+      );
+
+      if (similar) return acc;
+      return [...acc, curr];
+    }, []).slice(0, 5);
+
     return {
-      differences: result.differences.map((diff: any) => ({
+      differences: groupedDifferences.map((diff: any) => ({
         type: diff.type || 'spacing',
         description: diff.description || 'Diferencia detectada',
         priority: diff.priority || 'medium',
