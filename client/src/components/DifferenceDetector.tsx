@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Image, Rect } from 'react-konva';
 import { loadImage } from '@/lib/imageProcessing';
-import { analyzeImageDifferences } from '@/lib/openaiService';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquarePlus, MessageSquare, Download } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import * as React from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { DifferenceReport } from './DifferenceReport';
@@ -25,7 +24,6 @@ interface Comment {
 }
 
 export interface DesignDifference {
-  id: string; 
   type: 'spacing' | 'margin' | 'color' | 'font';
   description: string;
   location: {
@@ -41,7 +39,7 @@ export interface DesignDifference {
 export default function DifferenceDetector({ originalImage, implementationImage }: DifferenceDetectorProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [differences, setDifferences] = useState<DesignDifference[]>([]);
-  const [selectedDifference, setSelectedDifference] = useState<string | null>(null); 
+  const [selectedDifference, setSelectedDifference] = useState<number | null>(null);
   const [newComment, setNewComment] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<{
@@ -51,46 +49,6 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     original: null,
     implementation: null,
   });
-
-  const handleImageAnalysis = async (originalImg: HTMLImageElement, implementationImg: HTMLImageElement, containerWidth: number) => {
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = originalImg.width;
-      canvas.height = originalImg.height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      ctx.drawImage(originalImg, 0, 0);
-      const originalBase64 = canvas.toDataURL('image/png');
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(implementationImg, 0, 0);
-      const implementationBase64 = canvas.toDataURL('image/png');
-
-      console.log('Initiating image analysis...');
-      const analysis = await analyzeImageDifferences(originalBase64, implementationBase64);
-      console.log('Analysis completed:', analysis);
-
-      const aiDifferences = analysis.differences.map((diff, index) => ({
-        id: `diff-${Date.now()}-${index}`, 
-        type: diff.type,
-        description: diff.description,
-        location: {
-          x: 50, 
-          y: 100 + (index * 100), 
-          width: containerWidth - 100, 
-          height: 80 
-        },
-        priority: diff.priority,
-        comments: []
-      }));
-
-      setDifferences(aiDifferences);
-    } catch (error) {
-      console.error('Error in handleImageAnalysis:', error);
-    }
-  };
 
   useEffect(() => {
     const loadImages = async () => {
@@ -112,8 +70,6 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             width: containerWidth,
             height: originalImg.height * scale,
           });
-
-          await handleImageAnalysis(originalImg, implementationImg, containerWidth);
         }
       } catch (error) {
         console.error('Error loading images:', error);
@@ -122,6 +78,151 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
     loadImages();
   }, [originalImage, implementationImage]);
+
+  useEffect(() => {
+    const analyzeDesignDifferences = () => {
+      if (!images.original || !images.implementation) return;
+
+      const canvas1 = document.createElement('canvas');
+      const canvas2 = document.createElement('canvas');
+      const ctx1 = canvas1.getContext('2d');
+      const ctx2 = canvas2.getContext('2d');
+
+      if (!ctx1 || !ctx2) return;
+
+      canvas1.width = images.original.width;
+      canvas1.height = images.original.height;
+      canvas2.width = images.implementation.width;
+      canvas2.height = images.implementation.height;
+
+      ctx1.drawImage(images.original, 0, 0);
+      ctx2.drawImage(images.implementation, 0, 0);
+
+      const imageData1 = ctx1.getImageData(0, 0, canvas1.width, canvas1.height);
+      const imageData2 = ctx2.getImageData(0, 0, canvas2.width, canvas2.height);
+
+      const designDifferences: DesignDifference[] = [];
+
+      // Analizar diferencias de espaciado significativas
+      const spacingThreshold = 16;
+      let whitespaceRegions1 = detectWhitespaceRegions(imageData1, canvas1.width, canvas1.height);
+      let whitespaceRegions2 = detectWhitespaceRegions(imageData2, canvas2.width, canvas2.height);
+
+      // Filtrar regiones pequeñas y agrupar regiones cercanas
+      whitespaceRegions1 = whitespaceRegions1
+        .filter(r => r.width > 20)
+        .reduce((acc, curr) => {
+          const similar = acc.find(r =>
+            Math.abs(r.y - curr.y) < 40 &&
+            Math.abs(r.width - curr.width) < 20
+          );
+          if (similar) {
+            similar.width = Math.max(similar.width, curr.width);
+            return acc;
+          }
+          return [...acc, curr];
+        }, [] as any[]);
+
+      whitespaceRegions2 = whitespaceRegions2
+        .filter(r => r.width > 20)
+        .reduce((acc, curr) => {
+          const similar = acc.find(r =>
+            Math.abs(r.y - curr.y) < 40 &&
+            Math.abs(r.width - curr.width) < 20
+          );
+          if (similar) {
+            similar.width = Math.max(similar.width, curr.width);
+            return acc;
+          }
+          return [...acc, curr];
+        }, [] as any[]);
+
+      // Detectar diferencias de espaciado significativas
+      for (let i = 0; i < Math.min(whitespaceRegions1.length, whitespaceRegions2.length); i++) {
+        const region1 = whitespaceRegions1[i];
+        const region2 = whitespaceRegions2[i];
+
+        if (Math.abs(region1.width - region2.width) > spacingThreshold) {
+          designDifferences.push({
+            type: 'spacing',
+            description: `Ajustar espaciado horizontal: ${Math.abs(region1.width - region2.width)}px de diferencia`,
+            location: {
+              x: region1.x * dimensions.width / canvas1.width,
+              y: region1.y * dimensions.height / canvas1.height,
+              width: Math.max(region1.width, region2.width) * dimensions.width / canvas1.width,
+              height: 40
+            },
+            priority: Math.abs(region1.width - region2.width) > 32 ? 'high' : 'medium',
+            comments: []
+          });
+        }
+      }
+
+      // Analizar márgenes laterales
+      const margins1 = detectMargins(imageData1, canvas1.width, canvas1.height);
+      const margins2 = detectMargins(imageData2, canvas2.width, canvas2.height);
+      const marginThreshold = 16;
+
+      if (Math.abs(margins1.left - margins2.left) > marginThreshold) {
+        designDifferences.push({
+          type: 'margin',
+          description: `Corregir margen izquierdo: diferencia de ${Math.abs(margins1.left - margins2.left)}px`,
+          location: {
+            x: 0,
+            y: 0,
+            width: Math.max(margins1.left, margins2.left) * dimensions.width / canvas1.width,
+            height: dimensions.height
+          },
+          priority: 'high',
+          comments: []
+        });
+      }
+
+      // Detectar diferencias de color significativas
+      const colorDifferences = detectColorDifferences(imageData1, imageData2, canvas1.width, canvas1.height);
+      colorDifferences.forEach(diff => {
+        designDifferences.push({
+          type: 'color',
+          description: `Actualizar color: de ${diff.color1} a ${diff.color2}`,
+          location: {
+            x: diff.x * dimensions.width / canvas1.width,
+            y: diff.y * dimensions.height / canvas1.height,
+            width: 100,
+            height: 40
+          },
+          priority: 'medium',
+          comments: []
+        });
+      });
+
+      // Agrupar diferencias similares y eliminar duplicados
+      const groupedDifferences = designDifferences.reduce((acc: DesignDifference[], curr) => {
+        const similarDiff = acc.find(diff =>
+          diff.type === curr.type &&
+          Math.abs(diff.location.y - curr.location.y) < 100 &&
+          Math.abs(curr.location.width - curr.location.width) < 20
+        );
+
+        if (similarDiff) {
+          similarDiff.location = {
+            x: Math.min(similarDiff.location.x, curr.location.x),
+            y: Math.min(similarDiff.location.y, curr.location.y),
+            width: Math.max(similarDiff.location.width, curr.location.width),
+            height: Math.max(similarDiff.location.height, curr.location.height)
+          };
+          return acc;
+        }
+
+        return [...acc, curr];
+      }, []);
+
+      setDifferences(groupedDifferences);
+    };
+
+    if (images.original && images.implementation && dimensions.width > 0) {
+      analyzeDesignDifferences();
+    }
+  }, [images, dimensions]);
 
   const detectWhitespaceRegions = (imageData: ImageData, width: number, height: number) => {
     const regions = [];
@@ -180,8 +281,8 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
   const detectColorDifferences = (imageData1: ImageData, imageData2: ImageData, width: number, height: number) => {
     const differences = [];
-    const sampleSize = 10;
-    const colorThreshold = 30;
+    const sampleSize = 10; // Muestrear cada 10 píxeles para rendimiento
+    const colorThreshold = 30; // Umbral para diferencias de color significativas
 
     for (let y = 0; y < height; y += sampleSize) {
       for (let x = 0; x < width; x += sampleSize) {
@@ -199,6 +300,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       }
     }
 
+    // Agrupar diferencias de color cercanas
     return differences.reduce((acc, curr) => {
       const similar = acc.find(d =>
         Math.abs(d.x - curr.x) < 50 &&
@@ -240,7 +342,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     }
   };
 
-  const addComment = (differenceId: string, e: React.MouseEvent) => {
+  const addComment = (differenceIndex: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -248,9 +350,9 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
     setDifferences(prev => {
       const updated = [...prev];
-      const differenceIndex = updated.findIndex(diff => diff.id === differenceId);
-      if (differenceIndex === -1) return updated; 
-
+      if (!updated[differenceIndex].comments) {
+        updated[differenceIndex].comments = [];
+      }
       updated[differenceIndex].comments.push({
         id: Date.now().toString(),
         text: newComment,
@@ -275,30 +377,30 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                   height={dimensions.height}
                 />
               )}
-              <AnimatePresence>
-                {differences.map((diff) => {
-                  const colors = getColorForDifference(diff.type, diff.priority, diff.id === selectedDifference);
-                  return (
-                    <React.Fragment key={diff.id}>
-                      <Rect
-                        x={diff.location.x}
-                        y={diff.location.y}
-                        width={diff.location.width}
-                        height={diff.location.height}
-                        fill={colors.fill}
-                        stroke={colors.stroke}
-                        strokeWidth={1.5}
-                        onClick={() => setSelectedDifference(diff.id)}
-                        opacity={diff.id === selectedDifference ? 0.8 : 0.3}
-                        shadowColor="rgba(0,0,0,0.3)"
-                        shadowBlur={diff.id === selectedDifference ? 10 : 0}
-                        shadowOpacity={0.5}
-                        perfectDrawEnabled={false}
-                      />
-                    </React.Fragment>
-                  );
-                })}
-              </AnimatePresence>
+              {differences.map((diff, i) => {
+                const colors = getColorForDifference(diff.type, diff.priority, i === selectedDifference);
+                return (
+                  <Rect
+                    key={i}
+                    x={diff.location.x}
+                    y={diff.location.y}
+                    width={diff.location.width}
+                    height={diff.location.height}
+                    fill={colors.fill}
+                    stroke={colors.stroke}
+                    strokeWidth={1.5}
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      setSelectedDifference(i);
+                    }}
+                    opacity={i === selectedDifference ? 0.8 : 0.3}
+                    shadowColor="rgba(0,0,0,0.3)"
+                    shadowBlur={i === selectedDifference ? 10 : 0}
+                    shadowOpacity={0.5}
+                    perfectDrawEnabled={false}
+                  />
+                );
+              })}
             </Layer>
           </Stage>
         </div>
@@ -309,6 +411,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
             <PDFDownloadLink
               document={<DifferenceReport differences={differences} />}
               fileName="reporte-diferencias.pdf"
+              className="ml-auto"
             >
               {({ loading }) => (
                 <Button
@@ -316,33 +419,32 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                   size="sm"
                   disabled={loading || differences.length === 0}
                 >
-                  <span className="flex items-center">
-                    <Download className="h-4 w-4 mr-2" />
-                    {loading ? 'Generando...' : 'Exportar PDF'}
-                  </span>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar PDF
                 </Button>
               )}
             </PDFDownloadLink>
           </div>
-
           <ScrollArea className="h-[400px] pr-4">
-            {differences.map((diff) => (
+            {differences.map((diff, index) => (
               <motion.div
-                key={diff.id}
+                key={index}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
+                transition={{
+                  duration: 0.2,
+                  delay: index * 0.05
+                }}
               >
                 <div
                   className={`mb-4 border rounded-lg transition-all duration-200 ease-in-out
-                  ${diff.id === selectedDifference
-                    ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500 scale-102 shadow-sm'
-                    : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
+                    ${index === selectedDifference
+                      ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500 scale-102 shadow-sm'
+                      : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
                 >
-                  <div
+                  <div 
                     className="p-3 cursor-pointer"
-                    onClick={() => setSelectedDifference(diff.id === selectedDifference ? null : diff.id)}
+                    onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
                   >
                     <div className="flex items-center gap-2">
                       <motion.div
@@ -352,7 +454,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                           'bg-blue-500'
                         }`}
                         animate={{
-                          scale: diff.id === selectedDifference ? 1.2 : 1
+                          scale: index === selectedDifference ? 1.2 : 1
                         }}
                         transition={{ duration: 0.2 }}
                       />
@@ -388,12 +490,12 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                           </DialogHeader>
                           <div className="space-y-4">
                             <ScrollArea className="h-[200px] w-full pr-4">
-                              {diff.comments?.map((comment) => (
+                              {diff.comments?.map((comment, i) => (
                                 <motion.div
                                   key={comment.id}
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
-                                  transition={{ delay: 0.1 }}
+                                  transition={{ delay: i * 0.1 }}
                                   className="mb-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
                                 >
                                   <p className="text-sm">{comment.text}</p>
@@ -412,7 +514,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                               />
                             </div>
                             <Button
-                              onClick={(e) => addComment(diff.id, e)}
+                              onClick={(e) => addComment(index, e)}
                               className="w-full"
                               disabled={!newComment.trim()}
                             >
