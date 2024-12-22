@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { createServer } from "http";
 
 const app = express();
 app.use(express.json());
@@ -36,6 +37,33 @@ app.use((req, res, next) => {
   next();
 });
 
+const findAvailablePort = async (startPort: number, maxAttempts: number = 10): Promise<number> => {
+  for (let port = startPort; port < startPort + maxAttempts; port++) {
+    try {
+      const server = createServer();
+      await new Promise((resolve, reject) => {
+        server.once('error', (err: any) => {
+          if (err.code === 'EADDRINUSE') {
+            server.close();
+            resolve(false);
+          } else {
+            reject(err);
+          }
+        });
+        server.once('listening', () => {
+          server.close();
+          resolve(true);
+        });
+        server.listen(port, '0.0.0.0');
+      });
+      return port;
+    } catch (err) {
+      continue;
+    }
+  }
+  throw new Error(`No available ports found after ${maxAttempts} attempts starting from ${startPort}`);
+};
+
 (async () => {
   const server = registerRoutes(app);
 
@@ -47,19 +75,19 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    log(`serving on port ${PORT}`);
-  });
+  try {
+    const port = await findAvailablePort(5000);
+    server.listen(port, "0.0.0.0", () => {
+      log(`🚀 Servidor iniciado en http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error("Error al iniciar el servidor:", error);
+    process.exit(1);
+  }
 })();
