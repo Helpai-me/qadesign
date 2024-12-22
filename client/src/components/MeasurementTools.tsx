@@ -116,39 +116,40 @@ export default function MeasurementTools({ image }: MeasurementToolsProps) {
             )}
             {measurements.map((measurement, i) => (
               <React.Fragment key={i}>
-                {/* Línea de medición */}
+                {/* Línea de medición más sutil */}
                 <Line
                   points={measurement.points}
                   stroke="#2563eb"
-                  strokeWidth={1}
-                  dash={[4, 4]}
+                  strokeWidth={0.5}
+                  dash={[2, 2]}
+                  opacity={0.6}
                 />
-                {/* Puntos de inicio y fin */}
+                {/* Puntos más pequeños y sutiles */}
                 <Circle
                   x={measurement.points[0]}
                   y={measurement.points[1]}
-                  radius={3}
+                  radius={2}
                   fill="#2563eb"
-                  stroke="#ffffff"
-                  strokeWidth={1}
+                  opacity={0.6}
                 />
                 <Circle
                   x={measurement.points[2]}
                   y={measurement.points[3]}
-                  radius={3}
+                  radius={2}
                   fill="#2563eb"
-                  stroke="#ffffff"
-                  strokeWidth={1}
+                  opacity={0.6}
                 />
-                {/* Texto de la medida */}
+                {/* Texto más claro y limpio */}
                 <Text
-                  x={(measurement.points[0] + measurement.points[2]) / 2 - 15}
-                  y={(measurement.points[1] + measurement.points[3]) / 2 - 7}
+                  x={(measurement.points[0] + measurement.points[2]) / 2}
+                  y={(measurement.points[1] + measurement.points[3]) / 2 - 10}
                   text={`${Math.round(measurement.distance)}px`}
                   fill="#2563eb"
-                  fontSize={11}
+                  fontSize={10}
                   fontFamily="system-ui"
                   fontStyle="500"
+                  align="center"
+                  offsetX={20}
                 />
               </React.Fragment>
             ))}
