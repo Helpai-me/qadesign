@@ -73,103 +73,115 @@ export default function Home() {
         </motion.div>
 
         {/* Mostrar la imagen original inmediatamente */}
-        {originalImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
-            className="mb-8"
-          >
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Diseño Original</h3>
-                <div className="border rounded-lg overflow-hidden">
-                  <img src={originalImage} alt="Original design" className="w-full h-auto" />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {originalImage && (
+            <motion.div
+              key="original-preview"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="mb-8"
+            >
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Diseño Original</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <img 
+                      src={originalImage} 
+                      alt="Original design" 
+                      className="w-full h-auto object-contain max-h-[600px]"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Mostrar herramientas de comparación solo cuando ambas imágenes estén presentes */}
-        {originalImage && implementationImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <Tabs defaultValue="comparison" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="comparison">Comparación</TabsTrigger>
-                <TabsTrigger value="sideBySide">Lado a Lado</TabsTrigger>
-                <TabsTrigger value="measurement">Medición</TabsTrigger>
-                <TabsTrigger value="contrast">Contraste</TabsTrigger>
-                <TabsTrigger value="differences">Diferencias</TabsTrigger>
-              </TabsList>
+        <AnimatePresence>
+          {originalImage && implementationImage && (
+            <motion.div
+              key="comparison-tools"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+            >
+              <Tabs defaultValue="comparison" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="comparison">Comparación</TabsTrigger>
+                  <TabsTrigger value="sideBySide">Lado a Lado</TabsTrigger>
+                  <TabsTrigger value="measurement">Medición</TabsTrigger>
+                  <TabsTrigger value="contrast">Contraste</TabsTrigger>
+                  <TabsTrigger value="differences">Diferencias</TabsTrigger>
+                </TabsList>
 
-              <AnimatePresence mode="wait">
-                <TabsContent value="comparison">
-                  <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
-                    <Card>
-                      <CardContent className="p-6">
-                        <ImageComparison
-                          originalImage={originalImage}
-                          implementationImage={implementationImage}
-                        />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
+                <AnimatePresence mode="wait">
+                  <TabsContent value="comparison">
+                    <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
+                      <Card>
+                        <CardContent className="p-6">
+                          <ImageComparison
+                            originalImage={originalImage}
+                            implementationImage={implementationImage}
+                          />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </TabsContent>
 
-                <TabsContent value="sideBySide">
-                  <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
-                    <Card>
-                      <CardContent className="p-6">
-                        <SideBySideComparison
-                          originalImage={originalImage}
-                          implementationImage={implementationImage}
-                        />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
+                  <TabsContent value="sideBySide">
+                    <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
+                      <Card>
+                        <CardContent className="p-6">
+                          <SideBySideComparison
+                            originalImage={originalImage}
+                            implementationImage={implementationImage}
+                          />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </TabsContent>
 
-                <TabsContent value="measurement">
-                  <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
-                    <Card>
-                      <CardContent className="p-6">
-                        <MeasurementTools image={implementationImage} />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
+                  <TabsContent value="measurement">
+                    <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
+                      <Card>
+                        <CardContent className="p-6">
+                          <MeasurementTools image={implementationImage} />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </TabsContent>
 
-                <TabsContent value="contrast">
-                  <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
-                    <Card>
-                      <CardContent className="p-6">
-                        <ContrastChecker image={implementationImage} />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
+                  <TabsContent value="contrast">
+                    <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
+                      <Card>
+                        <CardContent className="p-6">
+                          <ContrastChecker image={implementationImage} />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </TabsContent>
 
-                <TabsContent value="differences">
-                  <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
-                    <Card>
-                      <CardContent className="p-6">
-                        <DifferenceDetector
-                          originalImage={originalImage}
-                          implementationImage={implementationImage}
-                        />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </TabsContent>
-              </AnimatePresence>
-            </Tabs>
-          </motion.div>
-        )}
+                  <TabsContent value="differences">
+                    <motion.div {...fadeIn} transition={{ duration: 0.3 }}>
+                      <Card>
+                        <CardContent className="p-6">
+                          <DifferenceDetector
+                            originalImage={originalImage}
+                            implementationImage={implementationImage}
+                          />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </TabsContent>
+                </AnimatePresence>
+              </Tabs>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
