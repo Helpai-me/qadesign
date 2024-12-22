@@ -67,6 +67,8 @@ const findAvailablePort = async (startPort: number, maxAttempts: number = 20): P
         server.listen(port, '0.0.0.0');
       });
 
+      // Añadir un pequeño delay entre intentos para evitar problemas de race condition
+      await new Promise(resolve => setTimeout(resolve, 100));
       return port;
     } catch (err) {
       lastError = err as Error;
@@ -98,7 +100,9 @@ const findAvailablePort = async (startPort: number, maxAttempts: number = 20): P
     }
 
     // Find available port and start server
-    const port = await findAvailablePort(5000);
+    // Permitir especificar el puerto a través de variable de entorno
+    const preferredPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
+    const port = await findAvailablePort(preferredPort);
     server.listen(port, "0.0.0.0", () => {
       const address = server.address() as AddressInfo;
       log(`🚀 Servidor iniciado en http://localhost:${address.port}`);
