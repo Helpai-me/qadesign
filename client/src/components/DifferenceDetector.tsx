@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquarePlus, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
+import * as React from 'react';
 
 interface DifferenceDetectorProps {
   originalImage: string;
@@ -49,23 +50,27 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
   useEffect(() => {
     const loadImages = async () => {
-      const [originalImg, implementationImg] = await Promise.all([
-        loadImage(originalImage),
-        loadImage(implementationImage),
-      ]);
+      try {
+        const [originalImg, implementationImg] = await Promise.all([
+          loadImage(originalImage),
+          loadImage(implementationImage),
+        ]);
 
-      setImages({
-        original: originalImg,
-        implementation: implementationImg,
-      });
-
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.offsetWidth;
-        const scale = containerWidth / originalImg.width;
-        setDimensions({
-          width: containerWidth,
-          height: originalImg.height * scale,
+        setImages({
+          original: originalImg,
+          implementation: implementationImg,
         });
+
+        if (containerRef.current) {
+          const containerWidth = containerRef.current.offsetWidth;
+          const scale = containerWidth / originalImg.width;
+          setDimensions({
+            width: containerWidth,
+            height: originalImg.height * scale,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading images:', error);
       }
     };
 
@@ -335,11 +340,17 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     }
   };
 
-  const addComment = (differenceIndex: number) => {
+  const addComment = (differenceIndex: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     if (!newComment.trim()) return;
 
     setDifferences(prev => {
       const updated = [...prev];
+      if (!updated[differenceIndex].comments) {
+        updated[differenceIndex].comments = [];
+      }
       updated[differenceIndex].comments.push({
         id: Date.now().toString(),
         text: newComment,
@@ -376,7 +387,10 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                     fill={colors.fill}
                     stroke={colors.stroke}
                     strokeWidth={1.5}
-                    onClick={() => setSelectedDifference(i)}
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      setSelectedDifference(i);
+                    }}
                     opacity={i === selectedDifference ? 0.8 : 0.3}
                     shadowColor="rgba(0,0,0,0.3)"
                     shadowBlur={i === selectedDifference ? 10 : 0}
@@ -480,7 +494,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                               />
                             </div>
                             <Button
-                              onClick={() => addComment(index)}
+                              onClick={(e) => addComment(index, e)}
                               className="w-full"
                               disabled={!newComment.trim()}
                             >
