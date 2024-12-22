@@ -83,7 +83,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       const designDifferences: DesignDifference[] = [];
 
       // Analizar diferencias de espaciado
-      const spacingThreshold = 16; // Aumentado para ser más selectivo
+      const spacingThreshold = 16; // Umbral para espaciado
       let whitespaceRegions1 = detectWhitespaceRegions(imageData1, canvas1.width, canvas1.height);
       let whitespaceRegions2 = detectWhitespaceRegions(imageData2, canvas2.width, canvas2.height);
 
@@ -113,12 +113,13 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       // Analizar márgenes laterales
       const margins1 = detectMargins(imageData1, canvas1.width, canvas1.height);
       const margins2 = detectMargins(imageData2, canvas2.width, canvas2.height);
-      const marginThreshold = 16; // Aumentado para ser más selectivo
+      const marginThreshold = 16;
 
+      // Solo analizar márgenes si la diferencia es significativa
       if (Math.abs(margins1.left - margins2.left) > marginThreshold) {
         designDifferences.push({
           type: 'margin',
-          description: `Margen izquierdo inconsistente (${margins1.left}px vs ${margins2.left}px)`,
+          description: `Márgenes laterales varían en dispositivos móviles`,
           location: {
             x: 0,
             y: 0,
@@ -128,20 +129,29 @@ export default function DifferenceDetector({ originalImage, implementationImage 
         });
       }
 
-      if (Math.abs(margins1.right - margins2.right) > marginThreshold) {
-        designDifferences.push({
-          type: 'margin',
-          description: `Margen derecho inconsistente (${canvas1.width - margins1.right}px vs ${canvas2.width - margins2.right}px)`,
-          location: {
-            x: Math.min(margins1.right, margins2.right) * dimensions.width / canvas1.width,
-            y: 0,
-            width: dimensions.width - Math.min(margins1.right, margins2.right) * dimensions.width / canvas1.width,
-            height: dimensions.height
-          }
-        });
-      }
+      // Agrupar diferencias similares
+      const groupedDifferences = designDifferences.reduce((acc: DesignDifference[], curr) => {
+        const similarDiff = acc.find(diff => 
+          diff.type === curr.type &&
+          Math.abs(diff.location.y - curr.location.y) < 100 && // Cercanas en el eje Y
+          Math.abs(Math.abs(curr.location.width - curr.location.width)) < 20 // Diferencia de ancho similar
+        );
 
-      setDifferences(designDifferences);
+        if (similarDiff) {
+          // Combinar las diferencias
+          similarDiff.location = {
+            x: Math.min(similarDiff.location.x, curr.location.x),
+            y: Math.min(similarDiff.location.y, curr.location.y),
+            width: Math.max(similarDiff.location.width, curr.location.width),
+            height: Math.max(similarDiff.location.height, curr.location.height)
+          };
+          return acc;
+        }
+
+        return [...acc, curr];
+      }, []);
+
+      setDifferences(groupedDifferences);
     };
 
     if (images.original && images.implementation && dimensions.width > 0) {
@@ -151,7 +161,6 @@ export default function DifferenceDetector({ originalImage, implementationImage 
 
   const detectWhitespaceRegions = (imageData: ImageData, width: number, height: number) => {
     const regions = [];
-    // Analizar cada 40 píxeles para reducir el ruido
     for (let y = 0; y < height; y += 40) {
       let start = null;
       let whiteCount = 0;
@@ -166,7 +175,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
           whiteCount++;
           if (start === null) start = x;
         } else {
-          if (start !== null && whiteCount > 20) { // Solo considerar espacios blancos significativos
+          if (start !== null && whiteCount > 20) {
             regions.push({
               x: start,
               y,
@@ -187,8 +196,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
     let right = 0;
     let contentFound = false;
 
-    // Analizar solo los bordes laterales
-    for (let y = 0; y < height; y += 2) { // Saltar píxeles para optimizar
+    for (let y = 0; y < height; y += 2) {
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
         const hasContent = imageData.data[i] < 240 ||
@@ -209,13 +217,13 @@ export default function DifferenceDetector({ originalImage, implementationImage 
   const getColorForDifference = (type: 'spacing' | 'margin', isSelected: boolean) => {
     if (type === 'spacing') {
       return {
-        fill: isSelected ? "rgba(59, 130, 246, 0.3)" : "rgba(59, 130, 246, 0.1)",
-        stroke: isSelected ? "rgba(59, 130, 246, 0.8)" : "rgba(59, 130, 246, 0.3)"
+        fill: isSelected ? "rgba(34, 197, 94, 0.3)" : "rgba(34, 197, 94, 0.1)",
+        stroke: isSelected ? "rgba(34, 197, 94, 0.8)" : "rgba(34, 197, 94, 0.3)"
       };
     }
     return {
-      fill: isSelected ? "rgba(34, 197, 94, 0.3)" : "rgba(34, 197, 94, 0.1)",
-      stroke: isSelected ? "rgba(34, 197, 94, 0.8)" : "rgba(34, 197, 94, 0.3)"
+      fill: isSelected ? "rgba(22, 163, 74, 0.3)" : "rgba(22, 163, 74, 0.1)",
+      stroke: isSelected ? "rgba(22, 163, 74, 0.8)" : "rgba(22, 163, 74, 0.3)"
     };
   };
 
@@ -260,13 +268,13 @@ export default function DifferenceDetector({ originalImage, implementationImage 
                 key={index}
                 className={`mb-2 p-2 border rounded-lg transition-colors cursor-pointer
                   ${index === selectedDifference 
-                    ? 'bg-accent border-primary' 
-                    : 'hover:bg-accent/50'}`}
+                    ? 'bg-green-100 border-green-500 dark:bg-green-900/30 dark:border-green-500' 
+                    : 'hover:bg-green-50 dark:hover:bg-green-900/10'}`}
                 onClick={() => setSelectedDifference(index === selectedDifference ? null : index)}
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
-                    diff.type === 'spacing' ? 'bg-blue-500' : 'bg-green-500'
+                    diff.type === 'spacing' ? 'bg-green-500' : 'bg-green-600'
                   }`} />
                   <span className="text-sm">{diff.description}</span>
                 </div>
