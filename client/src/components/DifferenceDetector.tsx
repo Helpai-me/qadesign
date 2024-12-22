@@ -99,7 +99,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
         if (Math.abs(region1.width - region2.width) > spacingThreshold) {
           designDifferences.push({
             type: 'spacing',
-            description: `Espaciado inconsistente en ${region1.y * dimensions.height / canvas1.height}px desde el tope (${Math.abs(region1.width - region2.width)}px vs ${region2.width}px)`,
+            description: `Espaciado inconsistente en el elemento (${Math.abs(region1.width - region2.width)}px de diferencia)`,
             location: {
               x: region1.x * dimensions.width / canvas1.width,
               y: region1.y * dimensions.height / canvas1.height,
@@ -119,7 +119,7 @@ export default function DifferenceDetector({ originalImage, implementationImage 
       if (Math.abs(margins1.left - margins2.left) > marginThreshold) {
         designDifferences.push({
           type: 'margin',
-          description: `Márgenes laterales varían en dispositivos móviles`,
+          description: `Márgenes laterales inconsistentes`,
           location: {
             x: 0,
             y: 0,
